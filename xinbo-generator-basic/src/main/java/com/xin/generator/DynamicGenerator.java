@@ -19,7 +19,7 @@ public class DynamicGenerator {
 
     public static void main(String[] args) throws IOException, TemplateException {
         MainTemplateConfig mainTemplateConfig = new MainTemplateConfig();
-        mainTemplateConfig.setAuthorName("lala");
+        mainTemplateConfig.setAuthorName("安徽金沙湖");
         mainTemplateConfig.setLoop(false);
         mainTemplateConfig.setOutputText("out:");
         String projectPath = System.getProperty("user.dir");

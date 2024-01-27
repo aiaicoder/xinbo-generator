@@ -12,7 +12,7 @@ import java.io.IOException;
 public class MainGenerator {
     public static void main(String[] args) throws TemplateException, IOException {
         MainTemplateConfig mainTemplateConfig = new MainTemplateConfig();
-        mainTemplateConfig.setAuthorName("lala");
+        mainTemplateConfig.setAuthorName("踩踩踩");
         mainTemplateConfig.setLoop(false);
         mainTemplateConfig.setOutputText("out:");
         doGenerate(mainTemplateConfig);
@@ -34,7 +34,6 @@ public class MainGenerator {
         String doInputPath = new File(parentFile,"xinbo-generator-basic"+File.separator+file).getAbsolutePath();
         //输出目录
         String doOutputPath = new File(parentFile,"xinbo-generator-basic"+File.separator+"acm-template/src/com/yupi/acm/MainTemplate.java").getAbsolutePath();
-
         //生成动态文件
         DynamicGenerator.doGenerate(doInputPath,doOutputPath, model);
 
