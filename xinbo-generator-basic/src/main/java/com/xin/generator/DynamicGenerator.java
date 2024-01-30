@@ -6,10 +6,10 @@ import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Map;
 
 /**
@@ -42,15 +42,14 @@ public class DynamicGenerator {
 
         myCfg.setDirectoryForTemplateLoading(templateDir);
         //加载模板
-        Template template = myCfg.getTemplate(new File(inputPath).getName());
+        Template template = myCfg.getTemplate(new File(inputPath).getName(),"UTF-8");
 
         Map<String, Object> dataModel = BeanUtil.beanToMap(templateConfig);
         //输出位置
-        FileWriter writer = new FileWriter(outputPath);
+        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)),StandardCharsets.UTF_8));
 
-        template.process(dataModel, writer);
-
-        writer.close();
+        template.process(dataModel, out);
+        out.close();
 
     }
 
