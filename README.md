@@ -306,7 +306,7 @@ The default [arity](https://picocli.info/#_arity) for interactive options is zer
 ```java
 /**
      *
-     * @param clazz 反射获取得到的内
+     * @param clazz 反射获取得到的类
      * @param args 用户传递的参数
      * @return 返回对应的参数
      * @param <T> 泛型
@@ -330,6 +330,69 @@ The default [arity](https://picocli.info/#_arity) for interactive options is zer
         return sb.toString().split(",");
     }
 ```
+
+### 命令模式的使用
+
+客户端 - > 命令（命令的转发） -> 命令接收对象
+
+
+
+命令模式的好处就是让我们实现客户端与服务对象解耦，通过命令，中间添加一个发出命令的遥控来处理，所以我们需要新增命令操作时，不需要修改客户端的代码
+
+
+
+### Picocli 命令行代码生成器开发
+
+分为3个子命令，查看文件列表，查看模板参数，以及最重要的文件生成
+
+- list
+- config
+- generate
+
+为了简化使用，要求能同时支持通过完整命令和交互式输入的方式来设置动态参数
+
+首先创建三个命令执行器的类
+
+![image-20240129111711564](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240129111711564.png)
+
+然后在主包中创建对应的主命令，分别对三个子命令进行绑定
+
+在创建一个主类进行进行逻辑
+
+<img src="https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240129112722395.png" alt="image-20240129112722395" style="zoom:50%;" />
+
+切记执行的时候要把测试的注释掉，不然等下打jar包的时候，指定了这个主类，在控制输入命令会失效
+
+```java
+public static void doGenerate(String inputPath, String outputPath, Object templateConfig) throws IOException, TemplateException {
+        //指定版本号
+        Configuration myCfg = new Configuration(Configuration.VERSION_2_3_32);
+        // 设置模板文件使用的字符集
+        myCfg.setDefaultEncoding("UTF-8");
+        //加载路径
+        File templateDir = new File(inputPath).getParentFile();
+
+        myCfg.setDirectoryForTemplateLoading(templateDir);
+        //加载模板
+        Template template = myCfg.getTemplate(new File(inputPath).getName(),"UTF-8");
+
+        Map<String, Object> dataModel = BeanUtil.beanToMap(templateConfig);
+        //输出位置
+    	//通过使用输出缓冲流，指定utf-8字符集，来解决乱码问题，如果git也是乱码，在设置中调为utf-8
+        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)),StandardCharsets.UTF_8));
+
+        template.process(dataModel, out);
+        out.close();
+    }
+```
+
+
+
+
+
+
+
+
 
 
 
