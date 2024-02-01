@@ -1,7 +1,7 @@
-package com.xin.generator;
+package com.xin.maker.generator.file;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.xin.model.MainTemplateConfig;
+import cn.hutool.core.io.FileUtil;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
@@ -15,22 +15,7 @@ import java.util.Map;
 /**
  * @author 15712
  */
-public class DynamicGenerator {
-
-    public static void main(String[] args) throws IOException, TemplateException {
-        MainTemplateConfig mainTemplateConfig = new MainTemplateConfig();
-        mainTemplateConfig.setAuthorName("安徽金沙湖");
-        mainTemplateConfig.setLoop(false);
-        mainTemplateConfig.setOutputText("out:");
-        String projectPath = System.getProperty("user.dir");
-
-        File file = new File("src/main/resources/templates/ACMTemplate.java.ftl");
-
-        String inputPath = projectPath + File.separator + file;
-        String outputPath = projectPath  + File.separator +  "src/MainTemplate.java";
-        doGenerate(inputPath, outputPath, mainTemplateConfig);
-
-    }
+public class DynamicFileGenerator {
 
     public static void doGenerate(String inputPath, String outputPath, Object templateConfig) throws IOException, TemplateException {
         //指定版本号
@@ -45,6 +30,14 @@ public class DynamicGenerator {
         Template template = myCfg.getTemplate(new File(inputPath).getName(),"UTF-8");
 
         Map<String, Object> dataModel = BeanUtil.beanToMap(templateConfig);
+
+        //文件路径如果不存在就创建文件
+        if (!FileUtil.exist(outputPath)) {
+            FileUtil.touch(outputPath);
+        }
+
+
+
         //输出位置
         BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)),StandardCharsets.UTF_8));
 

@@ -1,4 +1,4 @@
-package com.xin.config;
+package com.xin.maker.model;
 
 import lombok.Data;
 
@@ -6,7 +6,7 @@ import lombok.Data;
  * @author 15712
  */
 @Data
-public class MainTemplateConfig {
+public class DataModel {
 
     //作者名称
     private String authorName = "新";

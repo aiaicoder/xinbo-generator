@@ -81,7 +81,7 @@
 package com.xin.generator;
 
 import cn.hutool.core.bean.BeanUtil;
-import com.xin.config.MainTemplateConfig;
+import com.xin.model.MainTemplateConfig;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
@@ -89,7 +89,6 @@ import freemarker.template.TemplateException;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.Map;
 
 /**
@@ -106,10 +105,10 @@ public class DynamicGenerator {
 
         File file = new File("src/main/resources/templates");
 
-        String inputPath = projectPath+ File.separator +file;
+        String inputPath = projectPath + File.separator + file;
         String templateName = "ACMTemplate.java.ftl";
-        String outputPath = projectPath+ File.separator+ "mainTemplate.java";
-        extracted(inputPath,templateName,outputPath,mainTemplateConfig);
+        String outputPath = projectPath + File.separator + "mainTemplate.java";
+        extracted(inputPath, templateName, outputPath, mainTemplateConfig);
 
     }
 
@@ -127,7 +126,7 @@ public class DynamicGenerator {
         //输出位置
         FileWriter writer = new FileWriter(outputPath);
 
-        template.process(dataModel,writer);
+        template.process(dataModel, writer);
 
         writer.close();
 
@@ -141,7 +140,7 @@ public class DynamicGenerator {
 ```java
 package com.xin.generator;
 
-import com.xin.config.MainTemplateConfig;
+import com.xin.model.MainTemplateConfig;
 import freemarker.template.TemplateException;
 
 import java.io.File;
@@ -158,24 +157,25 @@ public class MainGenerator {
         mainTemplateConfig.setOutputText("out:");
         doGenerate(mainTemplateConfig);
     }
+
     public static void doGenerate(Object model) throws IOException, TemplateException {
         //获取当前路径
         String projectpath = System.getProperty("user.dir");
         //获取父路径
         File parentFile = new File(projectpath).getParentFile();
         //输入路径
-        String inputPath = new File(parentFile,"xinbo-generator-demo-projects"+File.separator+"acm-template").getAbsolutePath();
+        String inputPath = new File(parentFile, "xinbo-generator-demo-projects" + File.separator + "acm-template").getAbsolutePath();
         //输出路径
         String outputPath = projectpath;
         //生成静态文件
-        StaticGenerator.copyFilesByRecursive(inputPath,outputPath);
+        StaticGenerator.copyFilesByRecursive(inputPath, outputPath);
         //动态文件输入目录
         File file = new File("src/main/resources/templates/ACMTemplate.java.ftl");
-        String doInputPath = new File(parentFile,"xinbo-generator-basic"+File.separator+file).getAbsolutePath();
+        String doInputPath = new File(parentFile, "xinbo-generator-basic" + File.separator + file).getAbsolutePath();
         //输出目录
-        String doOutputPath = new File(parentFile,"xinbo-generator-basic"+File.separator+"acm-template/src/com/yupi/acm/MainTemplate.java").getAbsolutePath();
+        String doOutputPath = new File(parentFile, "xinbo-generator-basic" + File.separator + "acm-template/src/com/yupi/acm/MainTemplate.java").getAbsolutePath();
         //生成动态文件
-        DynamicGenerator.doGenerate(doInputPath,doOutputPath, model);
+        DynamicGenerator.doGenerate(doInputPath, doOutputPath, model);
 
     }
 }
@@ -388,9 +388,177 @@ public static void doGenerate(String inputPath, String outputPath, Object templa
 
 
 
+## 第二阶段开发制作代码生成器的工作（造轮子的轮子）
+
+这个阶段的目的就是省去我们手动编写指令，打包的步骤，提高我们生成模板的开发效率
+
+1. 工具应该提供那些更好的服务
+2. 如何动态生成我们需要的命令行工具
+3. 怎么挖坑
+
+### 元信息
+
+可以在下图中看到我们的编码路径都是为硬编码，写死在路径当中，所以我们需要一个配置文件去动态的修改文件的路径，这里我们称这种配置文件为元信息
+
+![image-20240201131428566](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240201131428566.png)
+
+设计元信息和设计数据库表是非常类似的，都要根据实际的业务需求，设置合适的存储结构、字段名称和类别
+
+元信息可以是json，可以是yaml
+
+注意，和设计库表一样，能提前确认的字段就提前确认，之后尽量只新增字段、避免修改字段。
+后面随着制作工具的能力增强，元信息的配置肯定会越来越多。为此，建议在外层尽量用对象来组织字段，而不是数组。在不确定信息的情况下，这么做更有利于字段的扩展
 
 
 
+先在resource目录下创建对应的我们要生成代码生成器的代码目录
+
+![image-20240201133619474](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240201133619474.png)
+
+
+
+其中，static 目录用于存放可以直接拷贝的静态文件。
+之后，可以把对应的模板文件放到对应的包下，和原项目的文件位置一一对应，便于理解和管理。
+
+
+
+在 maker.meta 包下新建 Meta 类，用于接受 JSON 字段。
+通过GsonFormatPlus将json字段转换为Meta类
+
+<img src="https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240201134527234.png" alt="image-20240201134527234" style="zoom:50%;" />
+
+部分代码
+
+但是有一个问题，如果我们用一次meta对象就要去创建一个新的meta，这样就会非常消耗我们的性能，因为我们每次都需要去读json文件，如果这个文件很大的话那么就会花费我们很多的事件，所以我们可以用双检索单例模式，让meta只初始化一次，这样就会大大的减少压力
+
+创建一个manager类来复制初始化meta
+
+```java
+package com.xin.maker.meta;
+
+import cn.hutool.core.io.resource.Resource;
+import cn.hutool.core.io.resource.ResourceUtil;
+import cn.hutool.json.JSONUtil;
+
+import java.io.BufferedReader;
+
+/**
+ * @author 15712
+ */
+public class MetaManager {
+
+	//volatile保证可见性，防止指令重排
+    private static volatile Meta meta;
+
+
+    private MetaManager() {
+        //私有构造器防止外部实例化
+    }
+
+
+    public static Meta getMeta(){
+        if (meta == null){
+            synchronized (MetaManager.class){
+                if (meta == null){
+                    meta = initMeta();
+                }
+            }
+        }
+        return null;
+    }
+
+
+    private static Meta initMeta(){
+        String metaJson = ResourceUtil.readUtf8Str("mete.json");
+        Meta meta = JSONUtil.toBean(metaJson, Meta.class);
+        //todo 校验处理默认值,防止用户输入不合法的内容
+        Meta.FileConfig fileConfig = new Meta.FileConfig();
+        return meta;
+
+    }
+
+}
+
+```
+
+通过freeMaker编写model模板
+
+```java
+package ${basePackage}.model;
+
+import lombok.Data;
+
+/**
+ * @author ${author}
+ */
+@Data
+public class DataModel {
+
+    <#list modelConfig.models as modelInfo>
+        <#if modelInfo.description??>
+        /**
+         * ${modelInfo.description}
+         */
+        </#if>
+        private ${modelInfo.type} ${modelInfo.fieldName} <#if modelInfo.defaultValue?? >= ${modelInfo.defaultValue?c}</#if>;
+        <#--其中，modelInfo.defaultValue?c 的作用是将任何类型的变量（比如 boolean 类型和 String 类型）都转换为字符串 -->
+    </#list>
+
+}
+```
+
+通过编写好的模板去生成对应文件
+
+```java
+package com.xin.maker.generator;
+
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.io.resource.ClassPathResource;
+import cn.hutool.core.util.StrUtil;
+import com.xin.maker.generator.file.DynamicFileGenerator;
+import com.xin.maker.meta.Meta;
+import com.xin.maker.meta.MetaManager;
+import freemarker.template.TemplateException;
+
+import java.io.File;
+import java.io.IOException;
+
+/**
+ * @author 15712
+ */
+public class MainGenerator {
+    public static void main(String[] args) throws TemplateException, IOException {
+        Meta meta = MetaManager.getMetaObject();
+        System.out.println(meta);
+
+        //输出根路径
+        String projectPath = System.getProperty("user.dir");
+        //输出路径
+        String outputPath = projectPath + File.separator + "generated"+ File.separator + meta.getName();
+        //检查文件夹是否存在，不存在就创建对应文件
+        if (!FileUtil.exist(outputPath)){
+            FileUtil.mkdir(outputPath);
+        }
+
+
+        //读取resource目录读取模板文件
+        ClassPathResource classPathResource = new ClassPathResource("");
+        String inputResourcePath = classPathResource.getAbsolutePath();
+
+        //java包的基础路径
+        String outputPackage = meta.getBasePackage();
+        String outputPackagePath = StrUtil.join("/",StrUtil.split(outputPackage, "."));
+        String outputBaseJavaPackagePat = outputPath + File.separator +"src/main/java/"+ outputPackagePath;
+
+        String inputFilePath;
+        String outputFilePath;
+        inputFilePath = inputResourcePath + File.separator + "templates/java/model/DataModel.java.ftl";
+        outputFilePath = outputBaseJavaPackagePat + File.separator + "model/DataModel.java";
+        DynamicFileGenerator.doGenerate(inputFilePath, outputFilePath, meta);
+    }
+}
+
+```
 
 
 

@@ -1,6 +1,9 @@
-package com.xin.generator;
+package com.xin.maker.generator.file;
 
-import com.xin.model.MainTemplateConfig;
+
+import com.xin.maker.meta.Meta;
+import com.xin.maker.meta.MetaManager;
+import com.xin.maker.model.DataModel;
 import freemarker.template.TemplateException;
 
 import java.io.File;
@@ -9,13 +12,10 @@ import java.io.IOException;
 /**
  * @author 15712
  */
-public class MainGenerator {
+public class FileGenerator {
     public static void main(String[] args) throws TemplateException, IOException {
-        MainTemplateConfig mainTemplateConfig = new MainTemplateConfig();
-        mainTemplateConfig.setAuthorName("踩踩踩");
-        mainTemplateConfig.setLoop(false);
-        mainTemplateConfig.setOutputText("out:");
-        doGenerate(mainTemplateConfig);
+        Meta meta = MetaManager.getMetaObject();
+        System.out.println(meta);
     }
     public static void doGenerate(Object model) throws IOException, TemplateException {
         //获取当前路径
@@ -27,15 +27,15 @@ public class MainGenerator {
         //输出路径
         String outputPath = projectpath;
         //生成静态文件
-        StaticGenerator.copyFilesByRecursive(inputPath,outputPath);
+        StaticFileGenerator.copyFilesByRecursive(inputPath,outputPath);
         //动态文件输入目录
         File file = new File("src/main/resources/templates/ACMTemplate.java.ftl");
 
-        String doInputPath = new File(parentFile,"xinbo-generator-basic"+File.separator+file).getAbsolutePath();
+        String doInputPath = new File(parentFile,"xinbo-generator-maker"+File.separator+file).getAbsolutePath();
         //输出目录
-        String doOutputPath = new File(parentFile,"xinbo-generator-basic"+File.separator+"acm-template/src/com/yupi/acm/MainTemplate.java").getAbsolutePath();
+        String doOutputPath = new File(parentFile,"xinbo-generator-maker"+File.separator+"acm-template/src/com/yupi/acm/MainTemplate.java").getAbsolutePath();
         //生成动态文件
-        DynamicGenerator.doGenerate(doInputPath,doOutputPath, model);
+        DynamicFileGenerator.doGenerate(doInputPath,doOutputPath, model);
 
     }
 
