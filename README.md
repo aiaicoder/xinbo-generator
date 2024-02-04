@@ -106,7 +106,7 @@ public class DynamicGenerator {
         File file = new File("src/main/resources/templates");
 
         String inputPath = projectPath + File.separator + file;
-        String templateName = "ACMTemplate.java.ftl";
+        String templateName = "MainTemplate.java.ftl";
         String outputPath = projectPath + File.separator + "mainTemplate.java";
         extracted(inputPath, templateName, outputPath, mainTemplateConfig);
 
@@ -170,7 +170,7 @@ public class MainGenerator {
         //生成静态文件
         StaticGenerator.copyFilesByRecursive(inputPath, outputPath);
         //动态文件输入目录
-        File file = new File("src/main/resources/templates/ACMTemplate.java.ftl");
+        File file = new File("src/main/resources/templates/MainTemplate.java.ftl");
         String doInputPath = new File(parentFile, "xinbo-generator-basic" + File.separator + file).getAbsolutePath();
         //输出目录
         String doOutputPath = new File(parentFile, "xinbo-generator-basic" + File.separator + "acm-template/src/com/yupi/acm/MainTemplate.java").getAbsolutePath();
@@ -407,7 +407,7 @@ public static void doGenerate(String inputPath, String outputPath, Object templa
 元信息可以是json，可以是yaml
 
 注意，和设计库表一样，能提前确认的字段就提前确认，之后尽量只新增字段、避免修改字段。
-后面随着制作工具的能力增强，元信息的配置肯定会越来越多。为此，建议在外层尽量用对象来组织字段，而不是数组。在不确定信息的情况下，这么做更有利于字段的扩展
+后面随着制作工具的能力增强，元信息的配置肯定会越来越多。为此，建议在外层尽量用对象来组织字段，而不是数组。在不确定信息的情况下，这么做更有利于字段的扩展，要知道那些字段是可以变化的，那些字段是重复编写，可以把这些统统放到元信息中统一的管理一下
 
 
 
@@ -560,11 +560,26 @@ public class MainGenerator {
 
 ```
 
+接下来的命令生成类也是同样的方法进行操作
 
 
 
+要将基础的类修改好之后再进行模板的修改，否则后期打包就会有各种问题频发
 
+<img src="https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240203142948367.png" alt="image-20240203142948367" style="zoom:50%;" />
 
+类似这种
 
+如果在idea出现报错控制台乱码是因为mvn是在win上是gbk的编码
 
+解决办法
+
+①修改命令脚本 -> maven安装目录/bin/mvn.cmd
+在mvn.cmd中搜索-D，在带-D的行后添加一行：“-Dfile.encoding=UTF-8” ^
+
+②配置环境变量 -> mvn命令运行时会读取名为MAVEN_OPTS的环境变量
+变量：MAVEN_OPTS
+值：-Dfile.encoding=UTF-8
+
+做完这里开始编写脚本文件
 

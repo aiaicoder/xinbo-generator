@@ -1,8 +1,8 @@
-package com.xin.maker.cli.command;
+package com.xin.cli.command;
 
 import cn.hutool.core.util.ReflectUtil;
 
-import com.xin.maker.model.DataModel;
+import com.xin.model.DataModel;
 import lombok.Data;
 import picocli.CommandLine.*;
 

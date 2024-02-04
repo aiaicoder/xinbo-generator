@@ -9,7 +9,7 @@ import lombok.Data;
 public class MainTemplateConfig {
 
     //作者名称
-    private String authorName = "新";
+    private String author = "新";
 
     //是否需要循环
     private Boolean loop = false;

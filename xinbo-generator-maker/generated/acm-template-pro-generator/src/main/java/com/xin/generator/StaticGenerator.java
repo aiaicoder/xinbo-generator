@@ -1,13 +1,13 @@
-package com.xin.maker.generator.file;
+package com.xin.generator;
 
 import cn.hutool.core.io.FileUtil;
 
 import java.io.File;
 
 /**
- * @author 15712
+ * @author xin
  */
-public class StaticFileGenerator {
+public class StaticGenerator {
 
 
     /**

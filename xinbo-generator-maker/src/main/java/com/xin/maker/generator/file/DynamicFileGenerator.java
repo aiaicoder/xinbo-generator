@@ -27,20 +27,15 @@ public class DynamicFileGenerator {
 
         myCfg.setDirectoryForTemplateLoading(templateDir);
         //加载模板
-        Template template = myCfg.getTemplate(new File(inputPath).getName(),"UTF-8");
+        Template template = myCfg.getTemplate(new File(inputPath).getName(), "UTF-8");
 
         Map<String, Object> dataModel = BeanUtil.beanToMap(templateConfig);
-
         //文件路径如果不存在就创建文件
         if (!FileUtil.exist(outputPath)) {
             FileUtil.touch(outputPath);
         }
-
-
-
         //输出位置
-        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)),StandardCharsets.UTF_8));
-
+        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)), StandardCharsets.UTF_8));
         template.process(dataModel, out);
         out.close();
 

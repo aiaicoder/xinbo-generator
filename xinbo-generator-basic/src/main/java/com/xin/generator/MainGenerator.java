@@ -12,7 +12,7 @@ import java.io.IOException;
 public class MainGenerator {
     public static void main(String[] args) throws TemplateException, IOException {
         MainTemplateConfig mainTemplateConfig = new MainTemplateConfig();
-        mainTemplateConfig.setAuthorName("踩踩踩");
+        mainTemplateConfig.setAuthor("踩踩踩");
         mainTemplateConfig.setLoop(false);
         mainTemplateConfig.setOutputText("out:");
         doGenerate(mainTemplateConfig);

@@ -22,10 +22,10 @@ import static com.xin.generator.StaticGenerator.copyFilesByRecursive;
  */
 public class Main {
     public static void main(String[] args) {
-//        args = new String[]{"generate","-a","lalal","-l","false"};
+        args = new String[]{"generate","-a","lalal","-l","false"};
 //        args = new String[]{"list"};
         CommandExecutor commandExecutor = new CommandExecutor();
-        addArgs(GenerateCommand.class, args);
+        args = addArgs(GenerateCommand.class, args);
         commandExecutor.doExecute(args);
     }
 

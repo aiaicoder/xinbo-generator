@@ -1,11 +1,11 @@
-package com.xin.maker.cli.utils;
+package ${basePackage}.cli.utils;
 
 import picocli.CommandLine;
 
 import java.lang.reflect.Field;
 
 /**
- * @author xin
+ * @author ${author}
  */
 public class CommandUtils {
     /**

@@ -1,14 +1,14 @@
-package com.xin.maker.cli;
+package com.xin.cli;
 
 
-import com.xin.maker.cli.command.ConfigCommand;
-import com.xin.maker.cli.command.GenerateCommand;
-import com.xin.maker.cli.command.ListCommand;
+import com.xin.cli.command.ConfigCommand;
+import com.xin.cli.command.GenerateCommand;
+import com.xin.cli.command.ListCommand;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 /**
- * @author 15712
+ * @author xin
  */
 @Command(name = "xinbo",mixinStandardHelpOptions = true)
 public class CommandExecutor implements Runnable{
