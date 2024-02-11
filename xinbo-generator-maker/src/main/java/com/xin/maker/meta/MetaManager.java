@@ -32,14 +32,15 @@ public class MetaManager {
     private static Meta initMeta(){
         String metaJson = ResourceUtil.readUtf8Str("meta.json");
         Meta meta = JSONUtil.toBean(metaJson, Meta.class);
-        //todo 校验处理默认值,防止用户输入不合法的内容
-        Meta.FileConfig fileConfig = new Meta.FileConfig();
+        //校验处理默认值,防止用户输入不合法的内容
+        MetaValidator.doValidAndFill(meta);
         return meta;
 
     }
 
         public static void main(String[] args) {
             Meta meta = MetaManager.getMetaObject();
+
             System.out.println(meta);
         }
     }

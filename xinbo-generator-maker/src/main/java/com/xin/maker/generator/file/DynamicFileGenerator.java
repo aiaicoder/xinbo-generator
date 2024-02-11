@@ -17,17 +17,22 @@ import java.util.Map;
  */
 public class DynamicFileGenerator {
 
-    public static void doGenerate(String inputPath, String outputPath, Object templateConfig) throws IOException, TemplateException {
+    public static void doGenerate(String inputPath, String outputPath, Object templateConfig) {
         //指定版本号
         Configuration myCfg = new Configuration(Configuration.VERSION_2_3_32);
         // 设置模板文件使用的字符集
         myCfg.setDefaultEncoding("UTF-8");
         //加载路径
         File templateDir = new File(inputPath).getParentFile();
-
-        myCfg.setDirectoryForTemplateLoading(templateDir);
-        //加载模板
-        Template template = myCfg.getTemplate(new File(inputPath).getName(), "UTF-8");
+        //模板文件
+        Template template;
+        try {
+            myCfg.setDirectoryForTemplateLoading(templateDir);
+            //加载模板
+            template = myCfg.getTemplate(new File(inputPath).getName(), "UTF-8");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         Map<String, Object> dataModel = BeanUtil.beanToMap(templateConfig);
         //文件路径如果不存在就创建文件
@@ -35,10 +40,13 @@ public class DynamicFileGenerator {
             FileUtil.touch(outputPath);
         }
         //输出位置
-        BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)), StandardCharsets.UTF_8));
-        template.process(dataModel, out);
-        out.close();
-
+        try {
+            BufferedWriter out = new BufferedWriter(new OutputStreamWriter(Files.newOutputStream(Paths.get(outputPath)), StandardCharsets.UTF_8));
+            template.process(dataModel, out);
+            out.close();
+        } catch (Exception e) {
+            throw new RuntimeException("文件异常");
+        }
     }
 
 }

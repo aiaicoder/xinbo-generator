@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets;
  * @author 15712
  */
 public class JarGenerator {
-    public static void doGenerate(String projectDir) throws IOException, InterruptedException {
+    public static void doGenerate(String projectDir) throws IOException {
         String winMavenCommand = "mvn.cmd clean package -DskipTests=true";
         String otherMavenCommand = "mvn clean package -DskipTests=true";
         String mavenCommand;
@@ -36,7 +36,12 @@ public class JarGenerator {
             System.out.println(readLine);
         }
         //等待命令执行完成
-        int exitCode = process.waitFor();
+        int exitCode = 0;
+        try {
+            exitCode = process.waitFor();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
         System.out.println("命令执行完成，退出码：" + exitCode);
     }
 }

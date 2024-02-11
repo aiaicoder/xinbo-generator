@@ -5,8 +5,10 @@
   "version": "1.0",
   "author": "xin",
   "createTime": "2024-2-1",
+  "gitInit": true,
   "fileConfig": {
-    "inputRootPath": "D:/www/planetProject/xinbo-generator/xinbo-generator-demo-projects/acm-template",
+    "inputRootPath": ".source/acm-template",
+    "sourceRootPath":"D:/www/planetProject/xinbo-generator/xinbo-generator-demo-projects/acm-template",
     "outputRootPath": "generated",
     "type": "dir",
     "files": [

@@ -583,3 +583,382 @@ public class MainGenerator {
 
 做完这里开始编写脚本文件
 
+
+
+
+
+### 代码优化
+
+可移植性
+
+现在的代码制作工具的可移植性不强，因为我们的模板原始文件都是硬编码写到了，代码里，但是如果换了一个环境，别人的电脑上没有这些代码那么我们的代码就运行不起来了
+
+如下图，MainGenerator 生成代码时依赖的 inputRootPath（模板文件路径）是固定的：
+
+![image-20240207143332895](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240207143332895.png)
+
+所以我们应该直接同时把模板的原文件也直接复制到生成的文件中，文件名称就叫.source，同时去更改meta元信息，修改meta中的代码，最后在MainGenerator中添加复制的原始模板文件的代码
+
+```java
+public class MainGenerator {
+
+    public static void main(String[] args) throws TemplateException, IOException, InterruptedException {
+    	...
+
+        // 输出根路径
+    	...
+
+        // 复制原始文件
+        String sourceRootPath = meta.getFileConfig().getSourceRootPath();
+        String sourceCopyDestPath = outputPath + File.separator + ".source";
+        FileUtil.copy(sourceRootPath, sourceCopyDestPath, false);
+
+        // 读取 resources 目录
+        ...
+    }
+}
+```
+
+可以
+
+![image-20240207145128956](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240207145128956.png)
+
+### 制作精简版代码生成器
+
+但其实，对于使用代码生成器的人来说，ta 可能并不关注这些文件，只要能运行脚本就好了。
+所以，我们可以生成更为精简的代码生成器，只需要保留 jar 包、脚本文件、原始模板文件，其他的都不用保留。
+由于项目还在开发阶段，我们不是修改原有的代码生成方式，而是额外生成一套精简版的代码生成器，放到 dist 目录下，便于后续调试、或者交给用户自己选择生成方式。
+
+思路就是先生成完整的文件，然后通过完整文件，进行copy，只复制出需要的文件
+
+
+
+### 健壮性的优化
+
+我们要对元信息中的用户输入的配置信息进行校验，防止用户输入非法信息
+
+**健壮性优化策略**
+
+常用的健壮性优化方式有：输入校验、异常处理、故障恢复（比如事务）、自动重试、降级等。
+对于咱们的制作工具项目，影响代码生成结果的、也是需要用户修改的核心内容是元信息配置文件，所以一定要对元信息进行校验、并且用默认值来填充空值，防止用户错误输入导致的异常，从而提高健壮性。
+
+#### 元信息校验和默认值填充
+
+| 字段                            | 默认值                                                       | 校验规则 |
+| ------------------------------- | ------------------------------------------------------------ | -------- |
+| name                            | my-generator                                                 |          |
+| description                     | 我的模板代码生成器                                           |          |
+| basePackage                     | com.xin                                                      |          |
+| version                         | 1.0                                                          |          |
+| author                          | yupi                                                         |          |
+| createTime                      | 当前日期                                                     |          |
+| fileConfig.sourceRootPath       |                                                              | 必填     |
+| fileConfig.inputRootPath        | .source + sourceRootPath 的最后一个层级路径                  |          |
+| fileConfig.outputRootPath       | 当前路径下的 generated                                       |          |
+| fileConfig.type                 | dir                                                          |          |
+| fileConfig.files.inputPath      |                                                              | 必填     |
+| fileConfig.files.outputPath     | 等于 inputPath                                               |          |
+| fileConfig.files.type           | inputPath 有文件后缀（如 .java）为 file，否则为 dir          |          |
+| fileConfig.files.generateType   | 如果文件结尾不为 .ftl，generateType 默认为 static，否则为 dynamic |          |
+| modelConfig.models.fieldName    |                                                              | 必填     |
+| modelConfig.models.description  |                                                              |          |
+| modelConfig.models.type         | String                                                       |          |
+| modelConfig.models.defaultValue |                                                              |          |
+| modelConfig.models.abbr         |                                                              |          |
+
+自定义异常类
+由于元信息校验是一个很重要的操作，所以专门定义一个元信息异常类，便于后续集中处理由于元信息输入错误导致的异常。
+在 maker.meta 目录下新增 MetaException.java 文件，代码如下：
+
+```java
+package com.xin.maker.meta;
+
+public class MetaException extends RuntimeException{
+    public MetaException(String message) {
+        super(message);
+    }
+
+    public MetaException(String message, Throwable cause) {
+        super(message, cause);
+    }
+}
+
+```
+
+校验代码
+
+```java
+package com.xin.maker.meta;
+
+import cn.hutool.core.collection.CollectionUtil;
+import cn.hutool.core.date.DateUnit;
+import cn.hutool.core.date.LocalDateTimeUtil;
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.StrUtil;
+
+import java.io.File;
+import java.nio.file.Paths;
+import java.time.LocalDate;
+import java.util.Iterator;
+import java.util.List;
+
+
+public class MetaValidator {
+    public static void doValidAndFill(Meta meta) {
+        //基础信息和默认值校验
+        String metaName = meta.getName();
+        if (StrUtil.isEmpty(metaName)) {
+            metaName = "my-generator";
+            meta.setName(metaName);
+        }
+        String description = meta.getDescription();
+        if (StrUtil.isEmpty(description)) {
+            description = "我的模板代码生成器";
+            meta.setDescription(description);
+        }
+        String basePackage = meta.getBasePackage();
+        if (StrUtil.isEmpty(basePackage)) {
+            basePackage = "com.xin";
+            meta.setBasePackage(basePackage);
+        }
+        String version = meta.getVersion();
+        if (StrUtil.isEmpty(version)) {
+            version = "1.0";
+            meta.setVersion(version);
+        }
+        String author = meta.getAuthor();
+        if (StrUtil.isEmpty(author)) {
+            author = "xin";
+            meta.setAuthor(author);
+        }
+        String createTime = meta.getCreateTime();
+        if (StrUtil.isEmpty(createTime)) {
+            createTime = LocalDateTimeUtil.format(LocalDate.now(), "yyyy-M-d");
+            meta.setCreateTime(createTime);
+        }
+        //校验文件的基本信息,还有默认值
+        Meta.FileConfig fileConfig = meta.getFileConfig();
+        if (fileConfig == null) {
+            throw new MetaException("文件信息不能为空");
+        }
+        String sourceRootPath = fileConfig.getSourceRootPath();
+        if (StrUtil.isEmpty(sourceRootPath)) {
+            throw new MetaException("未填写 sourceRootPath");
+        }
+        // inputRootPath：.source + sourceRootPath 的最后一个层级路径
+        String inputRootPath = fileConfig.getInputRootPath();
+        String defaultInputRootPath = ".source" + File.separator + FileUtil.getLastPathEle(Paths.get(sourceRootPath)).getFileName().toString();
+        if (StrUtil.isEmpty(inputRootPath)) {
+            fileConfig.setInputRootPath(defaultInputRootPath);
+        }
+        // outputRootPath默认当前路径的 generated
+        String outputRootPath = fileConfig.getOutputRootPath();
+        if (StrUtil.isEmpty(outputRootPath)) {
+            outputRootPath = "generated";
+            fileConfig.setOutputRootPath(outputRootPath);
+        }
+        String fileDitType = fileConfig.getType();
+        if (StrUtil.isEmpty(fileDitType)) {
+            fileDitType = "dir";
+            fileConfig.setType(fileDitType);
+        }
+        List<Meta.FileConfig.FileInfo> files = fileConfig.getFiles();
+        for (Meta.FileConfig.FileInfo fileInfo : files) {
+            String inputPath = fileInfo.getInputPath();
+            if (StrUtil.isBlank(inputPath)) {
+
+                throw new MetaException("文件路径不能为空");
+            }
+            // outputPath: 默认等于 inputPath
+            String outputPath = fileInfo.getOutputPath();
+            if (StrUtil.isEmpty(outputPath)) {
+                fileInfo.setOutputPath(inputPath);
+            }
+            // type：默认 inputPath 有文件后缀（如 .java）为 file，否则为 dir
+            String type = fileInfo.getType();
+            if (StrUtil.isBlank(type)) {
+                // 无文件后缀
+                if (StrUtil.isBlank(FileUtil.getSuffix(inputPath))) {
+                    fileInfo.setType("dir");
+                } else {
+                    fileInfo.setType("file");
+                }
+            }
+            // generateType：如果文件结尾不为 Ftl，generateType 默认为 static，否则为 dynamic
+            String generateType = fileInfo.getGenerateType();
+            if (StrUtil.isBlank(generateType)) {
+                // 为动态模板
+                if (inputPath.endsWith(".ftl")) {
+                    fileInfo.setGenerateType("dynamic");
+                } else {
+                    fileInfo.setGenerateType("static");
+                }
+            }
+
+        }
+        // modelConfig 校验和默认值
+        Meta.ModelConfig modelConfig = meta.getModelConfig();
+        if (modelConfig != null) {
+            List<Meta.ModelConfig.ModelInfo> modelInfoList = modelConfig.getModels();
+            if (CollectionUtil.isNotEmpty(modelInfoList)) {
+                for (Meta.ModelConfig.ModelInfo modelInfo : modelInfoList) {
+                    // 输出路径默认值
+                    String fieldName = modelInfo.getFieldName();
+                    if (StrUtil.isBlank(fieldName)) {
+                        throw new MetaException("未填写 fieldName");
+                    }
+
+                    String modelInfoType = modelInfo.getType();
+                    if (StrUtil.isEmpty(modelInfoType)) {
+                        modelInfo.setType("String");
+                    }
+                }
+            }
+        }
+    }
+}
+
+```
+
+### **圈复杂度优化**
+
+什么是圈复杂度？
+
+上面的代码虽然能够运行，但是过于复杂了，所有的校验规则全写在一起，会导致圈复杂度过高。
+圈复杂度（Cyclomatic Complexity）是一种用于评估代码复杂性的软件度量方法。一般情况下，代码的分支判断越多，圈复杂度越高。一般情况下，代码圈复杂度建议 <= 10，不建议超过 20！
+
+在圈复杂度的计算中，通常使用的指标有
+
+1. COGC (Cyclomatic Complexity)：圈复杂度，是一种通过计算图中的节点、边和连接组件的数量来度量程序复杂性的指标。COGC 通常用于衡量程序中的决策点数量。
+2. VG (节点个数)：表示图中节点的数量。
+3. EDGES (边的数量)：表示图中边的数量。
+4. EVG (Essential VG)：表示程序中的基本节点数，是计算中剔除掉虚拟节点后的节点数量。
+5. IVG (Inessential VG)：表示程序中的非基本节点数，是计算中保留的虚拟节点数量。
+
+通过工具可以看到圈复杂非常的高（MetricsReloaded）
+
+![image-20240209134133774](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240209134133774.png)
+
+优化方法：
+
+1）抽取方法
+我们可以按照元信息配置的层级，将整段代码抽为 3 个方法：基础元信息校验、fileConfig 校验、modelConfig 校验。
+
+2）在抽取的方法中使用 卫语句，尽早返回
+
+卫语句是在进入主要逻辑之前添加的条件检查语句，以确保程序在执行主要逻辑之前满足某些前提条件，这种技术有助于提高代码的可读性和可维护性。
+
+3）使用工具类减少判断代码
+
+比如基础元信息校验中，使用 Hutool 的 StrUtil.blankToDefault 代替 if (StrUtil.isBlank(xxx))，示例代码如下：
+
+### 模板方法
+
+除了前面提到的校验类之外，项目中还有一个实现流程比较复杂的文件 —— MainGenerator。这个文件的作用是读取元信息，然后根据流程生成不同的代码或执行不同的操作。
+之前我们是把所有的流程都写在了 main 方法里，大概 120 行代码。
+
+
+
+对应于标准流程的代码优化，我们第一时间要想到的就是模板方法设计模式。
+
+#### 什么是模板方法模式？
+
+模板方法模式通过父类定义了一套算法的标准执行流程，然后由子类具体实现每个流程的操作。使得子类在不改变执行流程结构的情况下，可以自主定义某些步骤的实现。
+
+举个例子，老师让所有的学生每天必须按顺序做 3 件事：
+
+1. 吃饭
+2. 睡觉
+3. 玩游戏
+
+这相当于定义了一套标准的执行流程，每位学生都必须遵循这个流程去行动，但是可以有不同的做法。
+
+比如小王：
+
+1. 吃拉面
+2. 站着睡觉
+3. 玩gta
+
+而小李可以：
+
+1. 吃米饭
+2. 躺着睡觉
+3. 玩apex
+
+这样，不仅可以让子类的行为更加规范、复用父类现成的执行流程，也可以通过创建新的子类来自定义每一步的具体操作，提高了程序的可扩展性。
+
+通过子类来继承父类的方法，来达到定制化效果
+
+**支持 Git 托管项目**
+
+制作工具生成的代码生成器支持使用 Git 版本控制工具来托管，可以根据元信息配置让开发者选择是否开启该特性。
+
+在元信息添加新的属性`gitInit`,类型为boolean，通过process来执行git命令，然后复制.gitignore到代码生成器的根目录实现git托管
+
+```java
+public class Meta {
+    private String name;
+    private String description;
+    private String basePackage;
+    private String version;
+    private String author;
+    private String createTime;
+    private FileConfig fileConfig;
+    private ModelConfig modelConfig;
+    private boolean gitInit;
+    ....
+    }
+    
+```
+
+```java
+protected void initGit(String outputPath) throws IOException, InterruptedException {
+        String initCommand = "git init";
+        ProcessBuilder pb = new ProcessBuilder(initCommand.split(" "));
+        pb.directory(new File(outputPath));
+        Process pro = pb.start();
+        pro.waitFor();
+    }
+```
+
+```java
+protected void generateCode(Meta meta, String outputPath){
+        ....
+        //执行gitInit,通过元信息判断是否开启git托管
+        if (meta.isGitInit()) {
+            try {
+                initGit(outputPath);
+            } catch (Exception e) {
+                System.out.println("git初始化异常："+e);
+            }
+            inputFilePath = inputResourcePath + File.separator + "templates/.gitignore.ftl";
+            outputFilePath = outputPath + File.separator + ".gitignore";
+            DynamicFileGenerator.doGenerate(inputFilePath, outputFilePath, meta);
+        }
+    }
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

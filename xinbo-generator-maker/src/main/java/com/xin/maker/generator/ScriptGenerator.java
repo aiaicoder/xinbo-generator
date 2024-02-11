@@ -27,7 +27,6 @@ public class ScriptGenerator {
             } catch (Exception e) {
                 System.out.println(e);
             }
-
             // windows
             sb = new StringBuilder();
             sb.append("@echo off").append("\n");

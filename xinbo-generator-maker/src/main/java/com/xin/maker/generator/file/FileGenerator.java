@@ -38,8 +38,8 @@ public class FileGenerator {
         outputPath = new File(outputRootPath,"src/com/xin/acm/MainTemplate.java").getAbsolutePath();
         DynamicFileGenerator.doGenerate(inputPath,outputPath,model);
 
-        inputPath = new File(inputRootPath,".gitignore").getAbsolutePath();
-        outputPath = new File(outputRootPath,".gitignore").getAbsolutePath();
+        inputPath = new File(inputRootPath,".gitignore.ftl").getAbsolutePath();
+        outputPath = new File(outputRootPath,".gitignore.ftl").getAbsolutePath();
         StaticFileGenerator.copyFilesByRecursive(inputPath,outputPath);
 
         inputPath = new File(inputRootPath,"README.md").getAbsolutePath();

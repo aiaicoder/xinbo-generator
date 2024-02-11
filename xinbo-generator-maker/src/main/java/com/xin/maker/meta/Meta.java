@@ -13,9 +13,6 @@ import java.util.List;
 @NoArgsConstructor
 @Data
 public class Meta {
-
-
-
     private String name;
     private String description;
     private String basePackage;
@@ -24,6 +21,7 @@ public class Meta {
     private String createTime;
     private FileConfig fileConfig;
     private ModelConfig modelConfig;
+    private boolean gitInit;
 
     @NoArgsConstructor
     @Data
@@ -32,6 +30,7 @@ public class Meta {
         private String outputRootPath;
         private String type;
         private List<FileInfo> files;
+        private String sourceRootPath;
 
         @NoArgsConstructor
         @Data
