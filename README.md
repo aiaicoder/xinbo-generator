@@ -938,6 +938,659 @@ protected void generateCode(Meta meta, String outputPath){
     }
 ```
 
+### 配置能力的增强
+
+下载精简的Spring Boot 项目模板
+
+**模板能力**
+
+在该项目的 README.md 文件中，可以看到关于该项目的介绍，比如运用的技术、业务特性、业务功能等。
+
+模板拥有的能力如下：
+1）实现了用户登录、注册、注销、更新、检索、权限管理
+2）帖子创建、删除、编辑、更新、数据库检索、ES 灵活检索
+3）使用了 MySQL、Redis、Elasticsearch 数据存储
+4）使用 Swagger + Knife4j 实现接口文档生成
+5）支持全局跨域处理
+
+文件的目录结构
+
+```
+.
+├── Dockerfile
+├── README.md
+├── mvnw
+├── mvnw.cmd
+├── pom.xml
+└── src
+    ├── main
+    │   ├── java
+    │   │   └── com
+    │   │       └── yupi
+    │   │           └── springbootinit
+    │   │               ├── MainApplication.java
+    │   │               ├── common
+    │   │               │   ├── BaseResponse.java
+    │   │               │   ├── DeleteRequest.java
+    │   │               │   ├── ErrorCode.java
+    │   │               │   ├── PageRequest.java
+    │   │               │   └── ResultUtils.java
+    │   │               ├── config
+    │   │               │   ├── CorsConfig.java
+    │   │               │   ├── JsonConfig.java
+    │   │               │   ├── Knife4jConfig.java
+    │   │               │   └── MyBatisPlusConfig.java
+    │   │               ├── constant
+    │   │               │   └── UserConstant.java
+    │   │               ├── controller
+    │   │               │   ├── PostController.java
+    │   │               │   └── UserController.java
+    │   │               ├── exception
+    │   │               │   ├── BusinessException.java
+    │   │               │   ├── GlobalExceptionHandler.java
+    │   │               │   └── ThrowUtils.java
+    │   │               ├── mapper
+    │   │               │   ├── PostMapper.java
+    │   │               │   └── UserMapper.java
+    │   │               ├── model
+    │   │               │   ├── dto
+    │   │               │   │   ├── post
+    │   │               │   │   │   ├── PostAddRequest.java
+    │   │               │   │   │   ├── PostEsDTO.java
+    │   │               │   │   │   ├── PostQueryRequest.java
+    │   │               │   │   │   └── PostUpdateRequest.java
+    │   │               │   │   └── user
+    │   │               │   │       ├── UserAddRequest.java
+    │   │               │   │       ├── UserLoginRequest.java
+    │   │               │   │       ├── UserQueryRequest.java
+    │   │               │   │       ├── UserRegisterRequest.java
+    │   │               │   │       └── UserUpdateRequest.java
+    │   │               │   ├── entity
+    │   │               │   │   ├── Post.java
+    │   │               │   │   └── User.java
+    │   │               │   ├── enums
+    │   │               │   │   └── UserRoleEnum.java
+    │   │               │   └── vo
+    │   │               │       └── LoginUserVO.java
+    │   │               └── service
+    │   │                   ├── PostService.java
+    │   │                   ├── UserService.java
+    │   │                   └── impl
+    │   │                       ├── PostServiceImpl.java
+    │   │                       └── UserServiceImpl.java
+    │   └── resources
+    │       ├── application.yml
+    │       └── mapper
+    │           ├── PostMapper.xml
+    │           └── UserMapper.xml
+    └── test
+        └── java
+```
+
+生成器应具备的功能
+
+基于模板具有的基本能力，我们可以分析用户可能会有哪些定制化的代码生成需求，并明确代码生成器应该具备的功能。
+
+比如：
+
+1. 替换生成的代码包名
+2. 控制是否开启帖子的相关功能
+3. 控制是否需要开启跨域
+4. 自定义Knife4jConfig接口文档
+5. 自定义MySql配置信息
+6. 控制是否开启redis
+7. 控制是否开启Elasticsearch
+
+实现思路
+
+1）需求：替换生成的代码包名
+
+实现思路：和之前替换包名的实现方式类似，可以将代码中所有出现包名的地方 “挖坑”，指定类似 basePackage 的模型参数，让用户自己输入。
+
+通用能力：由于用到包名的代码非常多，如果都要自己 “挖坑” 并制作 FTL 动态模板，不仅成本高、而且也容易出现遗漏（比如 @MapperScan 注解里也有包名）。
+
+所以我们需要利用制作工具来自动 “挖坑” 并生成模板文件。
+
+
+
+2）需求：控制是否生成帖子相关功能
+
+实现思路：允许用户输入一个开关参数来控制帖子功能相关的文件是否生成，比如 PostController、PostService、PostMapper、PostMapper.xml、Post 实体类等。
+
+通用能力：用一个参数同时控制多个文件是否生成，而不是仅仅是某段代码是否生成。
+
+
+
+3）需求：控制是否需要开启跨域
+
+实现思路：允许用户输入一个开关参数来控制跨域相关的文件是否生成，比如 CorsConfig.java 文件。
+
+通用能力：用一个参数控制某个文件是否生成，而不是仅能控制代码是否生成。
+
+
+
+4）需求：自定义 Knife4jConfig 接口文档配置
+
+实现思路：修改 Knife4jConfig 文件中的配置，比如 title、description、version、apis 扫描包路径等。
+
+通用能力：由于要支持用户输入的参数较多，可以用一个参数控制是否要开启接口文档配置。如果开启，再让用户输入 一组 配置参数。
+
+
+
+5）需求：自定义 MySQL 配置信息
+
+实现思路：修改 application.yml 配置文件中 MySQL 的 url、username、password 参数。
+
+通用能力：由于要支持用户输入的参数较多，可以定义一组隔离的配置参数。
+
+
+
+6）需求：控制是否开启 Redis
+
+实现思路：修改和开启 Redis 相关的代码，比如 application.yml、pom.xml、MainApplication.java 等多个文件的部分代码
+
+通用能力：用一个参数同时控制多个文件的代码修改（已满足）
+
+
+
+7）需求：控制是否开启 Elasticsearch
+
+实现思路：
+
+修改和 Elasticsearch 相关的代码，比如 PostController、PostService、PostServiceImpl、application.yml 等多个文件的部分代码
+
+用参数控制 PostEsDTO 整个文件是否生成
+
+通用能力：用一个参数同时控制多个文件的代码、以及某文件是否生成
+
+
+
+ 实现流程 
+
+通过上面的分析，我们会发现每个功能的实现所需要的通用能力各不相同，那我们应该先做什么、后做什么、怎么安排实现流程最合理呢？
+
+这里我们一定要综合考虑所有的需求，顾全大局；并且通过需求间的依赖关系、或者实现难易度去综合排序，一步步实现。
+
+
+
+现在的制作工具已经具有的能力是：根据某个模型参数同时控制多处代码的修改。
+
+而根据排序，制作工具需要增强的能力有：
+
+1一个模型参数对应某个文件是否生成
+
+2一个模型参数对应多个文件是否生成
+
+3一个模型参数同时控制多处代码修改以及文件是否生成
+
+4定义一组相关的模型参数，控制代码修改或文件生成
+
+5定义一组相关的模型参数，并能够通过其他的模型参数控制是否需要输入该组参数
+
+我们会发现，这些能力基本都和制作工具的 元信息配置文件 有关（因为我们所有做的修改都和元信息挂钩），即我们需要增强它的能力，允许开发者通过修改元信息文件，得到能让用户更灵活生成代码的代码生成器。
+
+
+
+通过不断增强元信息配置文件的能力，并且为了防止能力增强导致的冲突应当遵循2点原则
+
+配置文件中的fileConfig应专注于文件生成相关的逻辑
+
+配置文件中的 modelConfig 应专注于数据模型的定义。只是定义有某个参数，但该参数具体的作用是什么，不应该放在 modelConfig 中来控制。比如 model 可以用作配置开关、替换代码内容、控制文件是否生成等。
+
+例如ACM模板中的，通过一个模型参数needGit来控制是否生成 .gitignore 静态文件。
+
+```
+{
+        "fieldName": "needGit",
+        "type": "boolean",
+        "description": "是否生成 .gitignore 文件",
+        "defaultValue": false,
+        "abbr":"n"
+      }
+```
+
+```
+public static void doGenerate(DataModel model) throws IOException, TemplateException {}
+boolean needGit = model.isNeedGit();
+        if (needGit) {
+            inputPath = new File(inputRootPath, ".gitignore").getAbsolutePath();
+            outputPath = new File(outputRootPath, ".gitignore").getAbsolutePath();
+            StaticGenerator.copyFilesByRecursive(inputPath, outputPath);
+        }
+```
+
+上述代码中，有两处改动：
+
+1. 将 doGenerate 方法的入参类型修改为 DataModel，便于后续获取对象的属性
+2. 通过模型的 needGit 作为 if 条件，来判断是否生成 .gitignore 文件
+
+![image-20240221094940570](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240221094940570.png)
+
+并没有生成.gitignore
+
+![image-20240221094952120](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240221094952120.png)
+
+为了做到文件就是单纯的控制文件的生成，模型参数就是专注于模型的定义所以我们需要将是否生成文件和文件的生成关联起来
+
+修改元信息配置文件，给 fileConfig.files 对象新增 condition 字段。它的值可以是某个模型参数的名称，甚至还可以是表达式。
+比如指定值为 needGit，配置如下：
+
+```
+{
+	...
+  "fileConfig": {
+    "files": [
+      {
+        "inputPath": ".gitignore",
+        "outputPath": ".gitignore",
+        "type": "file",
+        "generateType": "static",
+        "condition": "needGit"
+      },
+    ]
+  },
+	...
+}
+```
+
+同步修改meta类给fileInfo新增字段
+
+确定了预期生成的 DataModel 代码后，修改 maker 项目的 DataModel.java.ftl 模板文件，修改属性的作用域为 public。完整代码如下：
+
+```
+package ${basePackage}.model;
+
+import lombok.Data;
+
+/**
+ * @author ${author}
+ */
+@Data
+public class DataModel {
+
+    <#list modelConfig.models as modelInfo>
+        <#if modelInfo.description??>
+        /**
+         * ${modelInfo.description}
+         */
+        </#if>
+        public ${modelInfo.type} ${modelInfo.fieldName} <#if modelInfo.defaultValue?? >= ${modelInfo.defaultValue?c}</#if>;
+        <#--其中，modelInfo.defaultValue?c 的作用是将任何类型的变量（比如 boolean 类型和 String 类型）都转换为字符串 -->
+    </#list>
+
+}
+```
+
+```ftl
+package ${basePackage}.generator;
+import freemarker.template.TemplateException;
+import com.xin.model.DataModel;
+import java.io.File;
+import java.io.IOException;
+
+/**
+ * @author ${author}
+ */
+<#macro generateFile indent fileInfo>
+${indent}inputPath = new File(inputRootPath,"${fileInfo.inputPath}").getAbsolutePath();
+${indent}outputPath = new File(outputRootPath,"${fileInfo.outputPath}").getAbsolutePath();
+<#if fileInfo.generateType == "dynamic">
+${indent}DynamicGenerator.doGenerate(inputPath,outputPath,model);
+<#else>
+${indent}StaticGenerator.copyFilesByRecursive(inputPath,outputPath);
+</#if>
+</#macro>
+public class MainGenerator {
+    /**
+     * 生成
+     *
+     * @param model 数据模型
+     * @throws TemplateException
+     * @throws IOException
+     */
+    public static void doGenerate(DataModel model) throws IOException, TemplateException {
+            String inputRootPath = "${fileConfig.inputRootPath}";
+            String outputRootPath =  "${fileConfig.outputRootPath}";
+
+            String inputPath;
+            String outputPath;
+        <#list modelConfig.models as modeInfo>
+            ${modeInfo.type} ${modeInfo.fieldName} = model.${modeInfo.fieldName};
+        </#list>
+
+        <#list fileConfig.files as fileInfo>
+            <#if fileInfo.condition??>
+            if(${fileInfo.condition}){
+                <@generateFile fileInfo=fileInfo indent="                " />
+            }
+                <#else >
+            </#if>
+            <@generateFile fileInfo=fileInfo indent="            " />
+        </#list>
+    }
+
+}
+```
+
+```
+<#macro generateFile indent fileInfo>
+${indent}inputPath = new File(inputRootPath,"${fileInfo.inputPath}").getAbsolutePath();
+${indent}outputPath = new File(outputRootPath,"${fileInfo.outputPath}").getAbsolutePath();
+<#if fileInfo.generateType == "dynamic">
+${indent}DynamicGenerator.doGenerate(inputPath,outputPath,model);
+<#else>
+${indent}StaticGenerator.copyFilesByRecursive(inputPath,outputPath);
+</#if>
+</#macro>
+```
+
+其中<#macro></#macro>为宏定义
+
+indent为缩进，fileInfo为宏定义中所需使用到的形参，
+
+```
+<#list fileConfig.files as fileInfo>
+            <#if fileInfo.condition??>
+            if(${fileInfo.condition}){
+                <@generateFile fileInfo=fileInfo indent="                " />
+            }
+                <#else >
+            </#if>
+            <@generateFile fileInfo=fileInfo indent="            " />
+        </#list>
+```
+
+**同参数控制多个文件生成**
+
+想要用同一个参数来控制多个文件是否生成，最简单的方式是直接给多个文件配置指定相同参数的 condition 就好了，比如：
+
+```
+"files": [
+  {
+    "inputPath": "src/com/yupi/acm/MainTemplate.java.ftl",
+    "outputPath": "src/com/yupi/acm/MainTemplate.java",
+    "type": "file",
+    "generateType": "dynamic",
+    "condition": "needGit"
+  },
+  {
+    "inputPath": ".gitignore",
+    "outputPath": ".gitignore",
+    "type": "file",
+    "generateType": "static",
+    "condition": "needGit"
+  }
+]
+```
+
+但如果之后我想统一更改这些字段的 condition 条件，或者查看某个 condition（或者模型参数）同时控制的多个文件怎么办？文件越多，会不会越难维护和管理？，同时如果需要修改还必须要一个一个进行修改就会比较麻烦
+
+
+
+所以我们就需要对文件进行分组
+
+有两种方案
+
+
+
+1. 给元信息的 fileInfo 增加 group 字段，指定每个文件所属的组。
+
+   参考代码：
+
+   ```
+   "files": [
+     {
+       "inputPath": "src/com/yupi/acm/MainTemplate.java.ftl",
+       "outputPath": "src/com/yupi/acm/MainTemplate.java",
+       "type": "file",
+       "generateType": "dynamic",
+       "group": "post"
+     }
+   ]
+   ```
+
+   然后可以在 fileConfig 增加 groupConfig 组配置，包括组名、生成条件等。
+   参考代码：
+
+   ```
+   "fileConfig": {
+     ...
+     "groupConfig": {
+       "groups": [
+         {
+           "name": "post",
+           "condition": "needCors"
+         }
+       ]
+     }
+   }
+   ```
+
+   这种方式很像设计库表，把组、文件分别定义，再通过文件指定所属组实现关联。
+   优点是结构清晰，可以通过读取 groupConfig 直接获取到所有组的信息。
+   但这种方式的缺点是，不好通过配置文件直接获取到同组下的所有文件。还可能会导致文件生成的代码不够优雅、会有很多重复的 if 块判断，【应为每一个文件生成都有condition，每一次生成都需要判断】，比如：
+
+   ```
+   boolean needGit = model.needGit;
+   
+   if (needGit) {
+       inputPath = new File(inputRootPath, ".gitignore").getAbsolutePath();
+       outputPath = new File(outputRootPath, ".gitignore").getAbsolutePath();
+       StaticGenerator.copyFilesByHutool(inputPath, outputPath);
+   }
+   
+   if (needGit) {
+       inputPath = new File(inputRootPath, "README.md").getAbsolutePath();
+       outputPath = new File(outputRootPath, "README.md").getAbsolutePath();
+       StaticGenerator.copyFilesByHutool(inputPath, outputPath);
+   }
+   ```
+
+   **方案二**
+
+   直接把文件组当成一个特殊的文件夹，可以把同组文件都放到该组配置下。
+   元信息部分代码如下：
+
+   ```
+   "files": [
+     {
+       "groupKey": "git",
+       "groupName": "开源",
+       "type": "group",
+       "condition": "needGit",
+       "files": [
+           {
+             "inputPath": ".gitignore",
+             "outputPath": ".gitignore",
+             "type": "file",
+             "generateType": "static"
+           },
+           {
+             "inputPath": "README.md",
+             "outputPath": "README.md",
+             "type": "file",
+             "generateType": "static"
+           }
+       ]
+     },
+     {
+       "inputPath": "src/com/yupi/acm/MainTemplate.java.ftl",
+       "outputPath": "src/com/yupi/acm/MainTemplate.java",
+       "type": "file",
+       "generateType": "dynamic"
+     }
+   ]
+   ```
+
+上述代码中新增字段：
+
+- groupKey：表示组的唯一表示
+- groupName：组的名称
+- type：值为 group 代表是分组
+- condition：该分组共享的生成条件，同时控制组内多个文件的生成
+
+这里整个组就是控制多个文件的生成
+
+**定义一组相关的参数**
+
+对于一个复杂的代码生成器，可能会有很多允许用户自定义的参数，比如光 MySQL 的配置，都可能有十几条。
+如果把所有这些参数全部按顺序写在元信息的模型配置中，可能用户在使用时，会被要求一次性输入大量的参数，增加使用和理解成本。而且配置之间有可能会有名称冲突，比如 MySQL 和其他数据库可能都有 url 配置。
+
+和上述文件分组类似，我们也可以对数据模型进行分组。各组下的模型参数互相隔离、保证不会出现命名冲突。
+
+```json
+{
+        "groupKey": "mainTemplate",
+        "groupName": "核心模板",
+        "type": "MainTemplate",
+        "description": "用于生成核心模板文件",
+        "models": [
+          {
+            "fieldName": "author",
+            "type": "String",
+            "description": "作者注释",
+            "defaultValue": "xin",
+            "abbr": "a"
+          },
+          {
+            "fieldName": "outputText",
+            "type": "String",
+            "description": "输出信息",
+            "defaultValue": "sum = ",
+            "abbr": "o"
+          }
+```
+
+上述代码的 modelInfo 中新增字段：
+
+- groupKey：组的唯一表示，有 groupKey 表示开启分组，必须为英文
+- groupName：组的名称
+- type：表示组对应的 Java Class 类型，必须为大写开头
+
+还需要修改 MetaValidator 的校验逻辑，如果模型的 groupKey 不为空，表示为模型组配置，则不校验 fieldName 等。
+
+
+
+同组参数封装
+既然参数都已经分组了，为了统一管理同组参数，我们可以将同组参数封装为一个类：
+
+```java
+/**
+ * 用于生成核心模板文件
+ */
+@Data
+public class MainTemplate {
+    /**
+     * 作者注释
+     */
+    public String author = "yupi";
+
+    /**
+     * 输出信息
+     */
+    public String outputText = "sum = ";
+}
+```
+
+然后可以在 DataModel 中定义该类型的属性字段，代码如下：
+
+```
+/**
+ * 核心模板
+ */
+public MainTemplate mainTemplate;
+```
+
+如何让用户的输入自动填充到该对象中呢？
+最直接方式：像原来一样让用户依次输入所有的参数，然后将参数一个个地设置到参数组对象中。
+但这种方式并不优雅，Picocli 作为一个强大的命令行开发框架，已经帮我们想到了复杂参数的场景，并提供了 参数组特性。
+Picocli 参数组官方介绍：https://picocli.info/#_argument_groups
+
+```java
+@Command(name = "sectiondemo", description = "Section demo")
+public class OptionSectionDemo {
+
+    @ArgGroup(validate = false, heading = "This is the first section%n")
+    Section1 section1;
+
+    static class Section1 {
+        @Option(names = "-a", description = "Option A") int a;
+        @Option(names = "-b", description = "Option B") int b;
+        @Option(names = "-c", description = "Option C") int c;
+    }
+
+    @ArgGroup(validate = false, heading = "This is the second section%n")
+    Section2 section2;
+
+    static class Section2 {
+        @Option(names = "-x", description = "Option X") int x;
+        @Option(names = "-y", description = "Option Y") int y;
+        @Option(names = "-z", description = "Option Z") int z;
+    }
+
+    public static void main(String[] args) {
+        new CommandLine(new OptionSectionDemo()).usage(System.out);
+    }
+}
+```
+
+**定义可选开启的参数组**
+
+我们的需求是：可以根据用户输入的某个开关参数，来控制是否要让用户输入其他的参数组。
+也就是说，我们的模型参数之间是存在依赖关系的，必须按照某个顺序依次引导用户输入。
+那其实我们可以想一种更优雅的交互方式：首先让用户输入最外层未分组的模型参数，然后再根据用户的输入情况，引导用户依次输入分组的参数。
+简单来说，就是对复杂的输入进行了分步，让用户一步步填写。
+
+**实现思路**
+
+1）给每个参数组创建一个独立的 Picocli Command 类，用于通过命令行接受该组参数值
+2）先用根 Command 类（GenerateCommand类）接受最外层未分组的参数
+3）外层参数输入完成后，在 run（或者 call）方法中判断输入的参数，如果需要使用参数组，就再次使用步骤 1 中创建的 Command 类和用户交互。
+
+制作工具实现
+已经确定了要制作的代码生成器的代码后，就可以增强制作工具，通过配置自动生成上述代码了。
+比较关键的一点是：如何根据一个模型参数，控制另一个模型参数组是否要输入？
+其实和控制文件是否生成的逻辑一样，我们给模型组增加一个 condition 字段，可以将其他模型参数的 fieldName 作为 condition 表达式的值。
+
+1）修改元信息文件的 models 组配置，补充 condition 字段，用 loop 字段来控制是否开启分组：
+
+同步修改 Meta 文件，给 ModelInfo 补充 condition 字段
+
+2）修改 DataModel.java.ftl 模板文件，目标是生成前面已经跑通流程的代码。
+
+3）注意，模型分组后，我们在 MainGenerator 中获取模型字段的代码也要修改，多取一个层级
+
+4）修改 GenerateCommand.java.ftl 模板文件，目标是生成前面已经跑通流程的代码。
+这里最复杂的地方在于如何根据 models 配置生成包含所有参数的 args 列表。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

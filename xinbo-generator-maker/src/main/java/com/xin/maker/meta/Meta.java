@@ -39,6 +39,10 @@ public class Meta {
             private String outputPath;
             private String type;
             private String generateType;
+            private String condition;
+            private String groupKey;
+            private String groupName;
+            private List<FileInfo> files;
         }
     }
 
@@ -56,6 +60,17 @@ public class Meta {
             // 默认值应该为一个Object接受不一定是Boolean
             private Object defaultValue;
             private String abbr;
+            //组
+            private String groupKey;
+            //组名
+            private String groupName;
+            //分组后的数据模型
+            private List<ModelInfo> models;
+            private String condition;
+            // 中间参数
+            // 该分组下所有参数拼接字符串
+            private String allArgsStr;
+
         }
     }
 }

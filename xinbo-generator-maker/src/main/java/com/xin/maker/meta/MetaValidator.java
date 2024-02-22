@@ -1,18 +1,14 @@
 package com.xin.maker.meta;
 
 import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.date.DateUnit;
 import cn.hutool.core.date.DateUtil;
-import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.io.FileUtil;
-import cn.hutool.core.util.BooleanUtil;
 import cn.hutool.core.util.StrUtil;
 
 import java.io.File;
 import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 public class MetaValidator {
@@ -32,14 +28,28 @@ public class MetaValidator {
         if (CollectionUtil.isNotEmpty(modelInfoList)) {
             for (Meta.ModelConfig.ModelInfo modelInfo : modelInfoList) {
                 // 输出路径默认值
-                String fieldName = modelInfo.getFieldName();
-                if (StrUtil.isBlank(fieldName)) {
-                    throw new MetaException("未填写 fieldName");
+                String groupKey = modelInfo.getGroupKey();
+                if (StrUtil.isNotBlank(groupKey)){
+                    List<Meta.ModelConfig.ModelInfo> models = modelInfo.getModels();
+                    models.forEach(MetaValidator::checkedAndFillModelInfo);
+                    //转换拼接子命令
+                    String allArgs = models.stream().map(subModelInfo -> String.format("\"--%s\"", subModelInfo.getFieldName())).collect(Collectors.joining(", "));
+                    modelInfo.setAllArgsStr(allArgs);
+                    continue;
                 }
-                String modelInfoType = StrUtil.blankToDefault(modelInfo.getType(), "String");
-                modelInfo.setType(modelInfoType);
+                checkedAndFillModelInfo(modelInfo);
             }
         }
+    }
+
+    private static void checkedAndFillModelInfo(Meta.ModelConfig.ModelInfo modelInfo) {
+        String fieldName = modelInfo.getFieldName();
+        if (StrUtil.isBlank(fieldName)) {
+            throw new MetaException("未填写 fieldName");
+        }
+
+        String modelInfoType = StrUtil.blankToDefault(modelInfo.getType(), "String");
+        modelInfo.setType(modelInfoType);
     }
 
     private static void validAndFillFileConfig(Meta meta) {
@@ -71,34 +81,47 @@ public class MetaValidator {
 
         List<Meta.FileConfig.FileInfo> files = fileConfig.getFiles();
         for (Meta.FileConfig.FileInfo fileInfo : files) {
-            String inputPath = fileInfo.getInputPath();
-            if (StrUtil.isBlank(inputPath)) {
-                throw new MetaException("文件路径不能为空");
+            String groupKey = fileInfo.getType();
+            //如果是在组里就无需校验
+            if (MetaEnum.GROUP.getValue().equals(groupKey)){
+                fileInfo.getFiles().forEach(MetaValidator::checkedAndFillFileInfo);
+                continue;
             }
-            // outputPath: 默认等于 inputPath
-            String outputPath  = StrUtil.blankToDefault(fileInfo.getOutputPath(), inputPath);
-            fileInfo.setOutputPath(outputPath);
-            // type：默认 inputPath 有文件后缀（如 .java）为 file，否则为 dir
-            String type = fileInfo.getType();
-            if (StrUtil.isBlank(type)) {
-                // 无文件后缀
-                if (StrUtil.isBlank(FileUtil.getSuffix(inputPath))) {
-                    fileInfo.setType(MetaEnum.DIR.getValue());
-                } else {
-                    fileInfo.setType(MetaEnum.FILE.getValue());
-                }
-            }
-            // generateType：如果文件结尾不为 Ftl，generateType 默认为 static，否则为 dynamic
-            String generateType = fileInfo.getGenerateType();
-            if (StrUtil.isBlank(generateType)) {
-                // 为动态模板
-                if (inputPath.endsWith(".ftl")) {
-                    fileInfo.setGenerateType("dynamic");
-                } else {
-                    fileInfo.setGenerateType("static");
-                }
-            }
+            checkedAndFillFileInfo(fileInfo);
 
+        }
+    }
+
+    /**
+     * 校验文件信息并且补充
+     * @param fileInfo 文件信息
+     */
+    private static void checkedAndFillFileInfo(Meta.FileConfig.FileInfo fileInfo) {
+        String inputPath = fileInfo.getInputPath();
+        if (StrUtil.isBlank(inputPath)) {
+            throw new MetaException("文件路径不能为空");
+        }
+        // outputPath: 默认等于 inputPath
+        String outputPath  = StrUtil.blankToDefault(fileInfo.getOutputPath(), inputPath);
+        fileInfo.setOutputPath(outputPath);
+        // type：默认 inputPath 有文件后缀（如 .java）为 file，否则为 dir
+        if (StrUtil.isBlank(fileInfo.getType())) {
+            // 无文件后缀
+            if (StrUtil.isBlank(FileUtil.getSuffix(inputPath))) {
+                fileInfo.setType(MetaEnum.DIR.getValue());
+            } else {
+                fileInfo.setType(MetaEnum.FILE.getValue());
+            }
+        }
+        // generateType：如果文件结尾不为 Ftl，generateType 默认为 static，否则为 dynamic
+        String generateType = fileInfo.getGenerateType();
+        if (StrUtil.isBlank(generateType)) {
+            // 为动态模板
+            if (inputPath.endsWith(".ftl")) {
+                fileInfo.setGenerateType("dynamic");
+            } else {
+                fileInfo.setGenerateType("static");
+            }
         }
     }
 

@@ -6,4 +6,8 @@ package com.xin.maker.generator.main;
  */
 public class MainGenerator extends GenerateTemplate {
 
+    @Override
+    protected void buildDist(String outputPath, String outputSourceRootPath, String jarPath, String shellOutputFilePath) {
+        System.out.println("不需要生成精简文件");
+    }
 }
