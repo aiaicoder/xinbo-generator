@@ -1563,53 +1563,507 @@ public class OptionSectionDemo {
 4）修改 GenerateCommand.java.ftl 模板文件，目标是生成前面已经跑通流程的代码。
 这里最复杂的地方在于如何根据 models 配置生成包含所有参数的 args 列表。
 
+开发小技巧
+
+> 开发复杂需求或新项目时，先一切从简，完成核心流程的开发。在这个过程中可以记录想法和扩展思路，后面再按需实现
+
+
+
+在上面的操作当中
+
+我们都是自己手动生成模板，自己挖坑，自己生成meta元信息，但是如果文件很多的话，也要慢慢生产吗
+
+下面的代码都遵循这张图
+
+在使用制作工具生成前，我们依次做了以下事情：
+
+1. 先指定一个原始的、待“挖坑”的输入文件
+2. 明确文件中需要被动态替换的内容和模型参数
+3. 自己编写 FreeMarker FTL 模板文件
+4. 自己编写生成器的元信息配置，包括基本信息、文件配置、模型参数配置
+
+
+
+前面两部都是我们先确定再去编写，所以在前两部确定的情况下可以通过程序实现后面两个步骤
+
+![image-20240227130057535](https://my-notes-li.oss-cn-beijing.aliyuncs.com/li/image-20240227130057535.png)
 
 
 
 
 
+第一步：输入模板基本信息
+
+```java
+  //输入基本信息
+  String name = "acm-template-generator";
+  String description = "ACM 示例模板生成器";
+```
+
+第二步：输入文件信息
+
+```java
+
+//输入文件的信息,目标文件
+        String projectPath = System.getProperty("user.dir");
+        String sourceRootPath = new File(projectPath).getParent() +
+                File.separator + "xinbo-generator-demo-projects/acm-template";
+        System.out.println(sourceRootPath);
+        //注意window的路径可能是\\，要进行字符串的替换
+        sourceRootPath = sourceRootPath.replaceAll("\\\\", "/");
+
+        //要挖坑的文件
+        String fileInputPath = "src/com/yupi/acm/MainTemplate.java";
+        String fileOutputPath = fileInputPath + ".flt";
+```
+
+第三步：模型参数
+
+```java
+//模型参数
+        Meta.ModelConfig.ModelInfo modelInfo = new Meta.ModelConfig.ModelInfo();
+        modelInfo.setFieldName("outputText");
+        modelInfo.setType("String");
+        modelInfo.setDefaultValue("sum =");
+
+        //使用字符串替换算法进行替换，通过使用hutool工具
+        String fileInputAbsolutePath = sourceRootPath + File.separator + fileInputPath;
+        String content = FileUtil.readUtf8String(fileInputAbsolutePath);
+        String replacement = String.format("{%s}", modelInfo.getFieldName());
+        String newFileContent = StrUtil.replace(content, "Sum: ", replacement);
+
+        //输出模板文件
+        //路径都用绝对路径
+        String fileOutPathAbsolutePath = sourceRootPath + File.separator + fileOutputPath;
+        FileUtil.writeUtf8String(newFileContent, fileOutPathAbsolutePath);
+
+        //三.
+        //输出元信息文件
+        String metaOutPath = sourceRootPath + File.separator + "meta.json";
+        //构造模型参数
+        Meta meta = new Meta();
+        meta.setName(name);
+        meta.setDescription(description);
+        //构造模板文件参数
+        Meta.FileConfig fileConfig = new Meta.FileConfig();
+        //将文件信息设置到meta元信息中
+        meta.setFileConfig(fileConfig);
+        //设置源文件位置
+        fileConfig.setSourceRootPath(sourceRootPath);
+        //创建存放文件信息的列表
+        List<Meta.FileConfig.FileInfo> fileInfoList = new ArrayList<>();
+        Meta.FileConfig.FileInfo fileInfo = new Meta.FileConfig.FileInfo();
+        //设置文件类型
+        fileInfo.setType(MetaEnum.FILE.getValue());
+        //设置文件生成类型
+        fileInfo.setGenerateType(FileGenerateTypeEnum.DYNAMIC.getValue());
+        //设置模板的输入路径（这里输入路径应该是模板的输出路径）
+        fileInfo.setOutputPath(fileOutputPath);
+        //设置生成文件的输出路径（通过模板生成的文件的输出路径）
+        fileInfo.setInputPath(fileOutputPath);
+        //将文件信息添加到列表当中
+        fileInfoList.add(fileInfo);
+        //将文件信息列表设置到文件信息中
+        fileConfig.setFiles(fileInfoList);
+
+
+        //构造模型参数
+        Meta.ModelConfig modelConfig = new Meta.ModelConfig();
+        //在元信息中设置模型参数
+        meta.setModelConfig(modelConfig);
+        //模型参数设置到列表中	
+        List<Meta.ModelConfig.ModelInfo> modelInfoList = new ArrayList<>();
+        //将模型参数列表添加到模型参数中
+        modelConfig.setModels(modelInfoList);
+        modelInfoList.add(modelInfo);
+        //作为json文件写出
+        FileUtil.writeUtf8String(JSONUtil.toJsonPrettyStr(meta), metaOutPath);
+```
+
+虽然制作模板的流程是跑通了，但我们会发现一个问题：上述代码直接在原始项目内生成了模板和元信息配置，其实是对原项目的污染。如果我们想重新生成，就得一个个删除上次生成的文件。
+
+
+
+这个时候我们就要隔离工作空间
+
+### **工作空间隔离**
+
+为了我们每次生成模板的时候不会对原文件进行修改这个时候就要将源文件复制到一个临时的目录进行模板的生成
+
+我们约定将 maker 项目下的 `.temp` 临时目录作为工作空间的根目录，并且在项目的 `.gitignore `文件中忽略该目录。
+
+1. 先定义一个原始项目的路径的存放位置
+2. 每次制作分配一个唯一 id（使用雪花算法），作为工作空间的名称，从而实现隔离
+3. 通过 FileUtil.copy 复制目录
+4. 改变量 sourceRootPath 的值为复制后的工作空间内的项目根目录
+
+```java
+public static void main(String[] args) {
+        //指定原始项目路径
+        String projectPath = System.getProperty("user.dir");
+        String originProjectPath = new File(projectPath).getParent() +
+                File.separator + "xinbo-generator-demo-projects/acm-template";
+        //复制目录
+        //目录的唯一性
+        long id = IdUtil.getSnowflakeNextId();
+        //临时工作区目录
+        String tempDirPath = projectPath + File.separator + ".temp";
+        String templatePath = tempDirPath + File.separator + id;
+        //判断是否存在目录，不存在就创建
+        if (FileUtil.exist(templatePath)){
+            FileUtil.mkdir(templatePath);
+        }
+        FileUtil.copy(originProjectPath, templatePath,true);
+
+
+        //输入基本信息
+        String name = "acm-template-generator";
+        String description = "ACM 示例模板生成器";
+        //输入文件的信息,目标文件，将这个改为隔离之后的工作目录
+        String sourceRootPath = templatePath + File.separator + FileUtil.getLastPathEle(new File(originProjectPath).toPath()).toString();
+        System.out.println(sourceRootPath);
+        //注意window的路径可能是\\，要进行字符串的替换
+        sourceRootPath = sourceRootPath.replaceAll("\\\\", "/");
+        .....
+        }
+```
+
+接下来就是对模板制作工具的改进，例如已经生成的模板可以继续进行修改，无需重新生成，可以后续多次追加配置，
+
+这个时候我们就要记录文件的修改状态
+
+有状态和无状态
+
+是指程序或请求多次执行时，下一次执行保留对上一次执行的记忆。比如用户登录后服务器会记住用户的信息，下一次请求就能正常使用系统。
+
+与之相对的是无状态。是指每次程序或请求执行，都像是第一次执行一样，没有任何历史信息
+
+有状态的实现
+
+需要两个要素：唯一标识，和存储
+
+唯一表示可以使用我们之前使用雪花算法生成的id
+
+存储就是我们在工作空间创建的文件
+
+
+
+### 多次制作实现
+
+如果根据 id 判断出并非首次制作，我们又应该做哪些调整呢？应该如何追加配置和文件呢？
+
+1. 非首次制作，不需要复制原始项目文件
+2. 非首次制作，可以在已有模板的基础上再次挖坑
+3. 非首次制作，不需要重复输入已有元信息，而是在此基础上覆盖和追加元信息配置
+
+配置文件重复的问题，通过转换为map进行解决
+
+```
+private static List<Meta.FileConfig.FileInfo> distinctFiles(List<Meta.FileConfig.FileInfo> files) {
+        Collection<Meta.FileConfig.FileInfo> fileInfos = files.stream().collect(Collectors.toMap(Meta.FileConfig.FileInfo::getInputPath, o -> o, (e, r) -> r)).values();
+        return new ArrayList<>(fileInfos);
+    }
+```
+
+上述代码中，用到了 Java 8 的 Stream API 和 Lambda 表达式来简化代码，其中 Collectors.toMap 表示将列表转换为 Map，详细解释一下：
+通过第一个参数（inputPath）作为 key 进行分组
+通过第二个参数作为 value 存储值（o -> o 表示使用原对象作为 value）
+最后的 (e, r) -> r 其实是 (exist, replacement) -> replacement 的缩写，表示遇到重复的值是保留新值，返回 exist 表示保留旧值。
+
+```java
+package com.xin.maker.template;
+
+import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.IdUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
+import com.xin.maker.meta.Meta;
+import com.xin.maker.meta.enums.FileGenerateTypeEnum;
+import com.xin.maker.meta.enums.MetaEnum;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
+
+/**
+ * @author 15712
+ */
+public class TemplateMaker {
+    public static void main(String[] args) {
+        long l = makeTemplate(1L);
+
+    }
+
+
+    public static long makeTemplate(Long id) {
+        if (id == null) {
+            id = IdUtil.getSnowflakeNextId();
+        }
+        //业务逻辑
+        //指定原始项目路径
+        String projectPath = System.getProperty("user.dir");
+        String originProjectPath = new File(projectPath).getParent() +
+                File.separator + "xinbo-generator-demo-projects/acm-template";
+        //复制目录
+        //目录的唯一性
+        //临时工作区目录
+        String tempDirPath = projectPath + File.separator + ".temp";
+        String templatePath = tempDirPath + File.separator + id;
+        //判断是否存在目录，不存在就创建
+        if (!FileUtil.exist(templatePath)) {
+            FileUtil.mkdir(templatePath);
+            //如果不存在说明是首次制作，就直接进行文件的复制，如果存在不需要复制原始项目文件
+            FileUtil.copy(originProjectPath, templatePath, true);
+        }
+
+
+        //输入基本信息
+        String name = "acm-template-generator";
+        String description = "ACM 示例模板生成器";
+        //输入文件的信息,目标文件，将这个改为隔离之后的工作目录
+        String sourceRootPath = templatePath + File.separator + FileUtil.getLastPathEle(new File(originProjectPath).toPath()).toString();
+        System.out.println(sourceRootPath);
+        //注意window的路径可能是\\，要进行字符串的替换
+        sourceRootPath = sourceRootPath.replaceAll("\\\\", "/");
+
+        //要挖坑的文件
+        String fileInputPath = "src/com/yupi/acm/MainTemplate.java";
+        String fileOutputPath = fileInputPath + ".ftl";
+
+        //模型参数
+        Meta.ModelConfig.ModelInfo modelInfo = new Meta.ModelConfig.ModelInfo();
+        modelInfo.setFieldName("outputText");
+        modelInfo.setType("String");
+        modelInfo.setDefaultValue("sum =");
+
+        //使用字符串替换算法进行替换，通过使用hutool工具
+        String fileInputAbsolutePath = sourceRootPath + File.separator + fileInputPath;
+        //文件输出的绝对路径
+        String fileOutPathAbsolutePath = sourceRootPath + File.separator + fileOutputPath;
+        String fileContent = null;
+        //判断模板文件是否被创建出来
+        if (FileUtil.exist(fileOutPathAbsolutePath)) {
+            //如果模板文件存在就直接读取，在原有的基础上继续追加替换
+            fileContent = FileUtil.readUtf8String(fileOutPathAbsolutePath);
+        } else {
+            //如果模板文件不存在就先读取工作区的项目文件，再进行替换
+            fileContent = FileUtil.readUtf8String(fileInputAbsolutePath);
+        }
+        String replacement = String.format("{%s}", modelInfo.getFieldName());
+        String newFileContent = StrUtil.replace(fileContent, "Sum: ", replacement);
+
+        //输出模板文件
+        FileUtil.writeUtf8String(newFileContent, fileOutPathAbsolutePath);
+
+        //三.
+        //将文件信息提前，不管是第一次修改，还是第二次修改，都可以使用
+        Meta.FileConfig.FileInfo fileInfo = new Meta.FileConfig.FileInfo();
+        //设置模板的输入路径（这里输入路径应该是模板的输出路径）
+        fileInfo.setOutputPath(fileOutputPath);
+        //设置生成文件的输出路径（通过模板生成的文件的输出路径）
+        fileInfo.setInputPath(fileInputPath);
+        //设置文件类型
+        fileInfo.setType(MetaEnum.FILE.getValue());
+        //设置文件生成类型
+        fileInfo.setGenerateType(FileGenerateTypeEnum.DYNAMIC.getValue());
+
+        //输出元信息文件
+        String metaOutPath = sourceRootPath + File.separator + "meta.json";
+
+        //判断是否是第一次构建元信息文件
+        if (FileUtil.exist(metaOutPath)) {
+            //如果元信息文件存在就直接读取，在原有的基础上继续追加替换
+            String metaContent = FileUtil.readUtf8String(metaOutPath);
+            //将元信息文件的内容转换为json对象
+            Meta oldMeta = JSONUtil.toBean(metaContent, Meta.class);
+            //将文件信息添加到元信息文件当中
+            List<Meta.FileConfig.FileInfo> fileInfoList = oldMeta.getFileConfig().getFiles();
+            fileInfoList.add(fileInfo);
+            List<Meta.ModelConfig.ModelInfo> modelInfoList = oldMeta.getModelConfig().getModels();
+            modelInfoList.add(modelInfo);
+
+            //去除重复的配置信息
+            oldMeta.getFileConfig().setFiles(distinctFiles(fileInfoList));
+            oldMeta.getModelConfig().setModels(distinctModels(modelInfoList));
+
+            //更新元信息文件
+            FileUtil.writeUtf8String(JSONUtil.toJsonPrettyStr(oldMeta), metaOutPath);
+        } else {
+            //如果是第一次构建,就重新构造模型参数
+            Meta meta = new Meta();
+            meta.setName(name);
+            meta.setDescription(description);
+
+            //构造模板文件参数
+            Meta.FileConfig fileConfig = new Meta.FileConfig();
+            //将文件信息设置到meta元信息中
+            meta.setFileConfig(fileConfig);
+            //设置源文件位置
+            fileConfig.setSourceRootPath(sourceRootPath);
+            //创建存放文件信息的列表
+            List<Meta.FileConfig.FileInfo> fileInfoList = new ArrayList<>();
+            //将文件信息列表设置到文件信息中
+            fileConfig.setFiles(fileInfoList);
+            //将文件信息添加到列表当中
+            fileInfoList.add(fileInfo);
+
+            //构造模型参数
+            Meta.ModelConfig modelConfig = new Meta.ModelConfig();
+            //在元信息中设置模型参数
+            meta.setModelConfig(modelConfig);
+            //模型参数设置到列表中
+            List<Meta.ModelConfig.ModelInfo> modelInfoList = new ArrayList<>();
+            //将模型参数列表添加到模型参数中
+            modelConfig.setModels(modelInfoList);
+            modelInfoList.add(modelInfo);
+            //作为json文件写出
+            FileUtil.writeUtf8String(JSONUtil.toJsonPrettyStr(meta), metaOutPath);
+        }
+        return id;
+    }
+
+    /**
+     * 去除重复的文件信息
+     * @param files 文件信息列表
+     * @return 去重后的文件信息列表
+     */
+    private static List<Meta.FileConfig.FileInfo> distinctFiles(List<Meta.FileConfig.FileInfo> files) {
+        Collection<Meta.FileConfig.FileInfo> fileInfos = files.stream().collect(Collectors.toMap(Meta.FileConfig.FileInfo::getInputPath, o -> o, (e, r) -> r)).values();
+        return new ArrayList<>(fileInfos);
+    }
+
+    private static List<Meta.ModelConfig.ModelInfo> distinctModels(List<Meta.ModelConfig.ModelInfo> metes) {
+        Collection<Meta.ModelConfig.ModelInfo> modelInfos = metes.stream().collect(
+                Collectors.toMap(Meta.ModelConfig.ModelInfo::getFieldName, o -> o, (e, r) -> r))
+                .values();
+        return new ArrayList<>(modelInfos);
+    }
+}
+
+```
+
+
+
+将固定参数提取出来
+
+```java
+public static long makeTemplate(Meta newMeta,
+                                    String originProjectPath,
+                                    String fileInputPath,Meta.ModelConfig.ModelInfo modelInfo,String searchStr,Long id) {
+```
+
+多个模板的制作，将制作模板的方法抽象出来，通过遍历文件的形式进行制作
+
+```java
+private static Meta.FileConfig.FileInfo makeFileTemplate(Meta.ModelConfig.ModelInfo modelInfo, String searchStr, String sourceRootPath,File inputFile) {
+...
+    return fileinfo;
+}
+```
+
+将文件信息返回
+
+其中最后一展示为文件类型，如果是相对路径，是找不到对应文件的
+
+sourceRootPath的作用则是将绝对路径替换成相对路径
+
+制作模板部分
+
+这个变量就是文件或者目录的绝对路径
+
+```java
+String inputFileAbsolutePath = sourceRootPath + File.separator + fileInputPath;
+```
+
+通过hutool来判断是否是目录和文件，如果是目录就遍历目录下的文件，执行模板制作
+
+详情见源码
+
+实现多个文件同时制作，只要把输入路径改为集合即可，在外层多加一个遍历就行
+
+
+
+### **文件过滤**
+
+> 需求：控制是否生成帖子相关功能
+> 实现思路：允许用户输入一个开关参数来控制帖子功能相关的文件是否生成，比如 PostController、PostService、PostMapper、PostMapper.xml、Post 实体类等。
+> 通用能力：某个范围下的多个指定文件挖坑 => 绑定同个参数
+
+过滤文件的json结构
+
+```json
+{
+  "files": [
+    {
+      "path": "文件（目录）路径",
+      "filters": [
+        {
+          "range": "fileName",
+          "rule": "regex",
+          "value": ".*lala.*"
+        },
+        {
+          "range": "fileContent",
+          "rule": "contains",
+          "value": "haha"
+        }
+      ]
+    }
+  ],
+}
+```
+
+对应到具体的java类,外层
+
+```java
+public class TemplateMakerFileConfig {
+    private List<FileInfoConfig> fileInfoConfig;
+
+    private static class FileInfoConfig{
+        private String path;
+        private List<FileFilterConfig> filterConfigList;
+    }
+}
+```
+
+如果想使用 or 逻辑（有一个过滤条件符合要求就保留），可以定义多个重复的 file，并且每个 file 指定一个过滤条件来实现
+
+创建一个枚举值来确定过滤的范围是文件名称还是文件内容
 
 
 
 
 
+模板制作工具类使用过滤器
 
+因为已经进行了文件的过滤会返回过滤后的路径，并且返回的一定是文件所以之前的逻辑就可以省略一部分
 
+```java
+List<TemplateMakerFileConfig.FileInfoConfig> fileConfigInfoList =  templateMakerFileConfig.getFileInfoConfig();
+        //生成文件模板
+        List<Meta.FileConfig.FileInfo> newFileInfoList = new ArrayList<>();
+        //可以同时多个文件生成
+        for (TemplateMakerFileConfig.FileInfoConfig fileInfoConfig : fileConfigInfoList) {
+            String inputFilePath = fileInfoConfig.getPath();
 
+            //文件的输入路径一定要是绝对路径
+            if (!inputFilePath.startsWith(sourceRootPath)){
+                inputFilePath = sourceRootPath + File.separator + inputFilePath;
+            }
 
+            // 获取过滤后的文件列表（不会存在目录）
 
+            List<File> fileList = FileFilter.doFilter(inputFilePath, fileInfoConfig.getFilterConfigList());
 
+            for (File file : fileList) {
+                Meta.FileConfig.FileInfo fileInfo = makeFileTemplate(modelInfo, searchStr, sourceRootPath, file);
+                newFileInfoList.add(fileInfo);
+            }
+```
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+同时还为了支持文件分组在fileFilterConfig中添加了新的groupconfig
 
 
 

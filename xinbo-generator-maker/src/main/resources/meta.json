@@ -8,8 +8,8 @@
   "gitInit": true,
   "fileConfig": {
     "inputRootPath": ".source/acm-template",
-    "sourceRootPath":"D:/www/planetProject/xinbo-generator/xinbo-generator-demo-projects/acm-template",
     "outputRootPath": "generated",
+    "sourceRootPath":"D:/www/planetProject/xinbo-generator/xinbo-generator-demo-projects/acm-template",
     "type": "dir",
     "files": [
       {

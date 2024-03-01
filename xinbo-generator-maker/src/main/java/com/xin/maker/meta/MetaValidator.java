@@ -4,6 +4,8 @@ import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.StrUtil;
+import com.xin.maker.meta.enums.FileGenerateTypeEnum;
+import com.xin.maker.meta.enums.MetaEnum;
 
 import java.io.File;
 import java.nio.file.Paths;
@@ -118,9 +120,9 @@ public class MetaValidator {
         if (StrUtil.isBlank(generateType)) {
             // 为动态模板
             if (inputPath.endsWith(".ftl")) {
-                fileInfo.setGenerateType("dynamic");
+                fileInfo.setGenerateType(FileGenerateTypeEnum.DYNAMIC.getValue());
             } else {
-                fileInfo.setGenerateType("static");
+                fileInfo.setGenerateType(FileGenerateTypeEnum.STATIC.getValue());
             }
         }
     }

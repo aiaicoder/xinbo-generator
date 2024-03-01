@@ -1,14 +1,17 @@
-package com.xin.maker.meta;
+package com.xin.maker.meta.enums;
 
-public enum MetaEnum {
-    FILE("文件","file"),
-    DIR("目录","dir"),
-    GROUP("文件组", "group");
+/**
+ * @author 15712
+ */
+
+public enum FileGenerateTypeEnum {
+    STATIC("静态","static"),
+    DYNAMIC("动态","dynamic");
 
     private final String text;
     private final String value;
 
-    MetaEnum(String text, String value) {
+    FileGenerateTypeEnum(String text, String value) {
         this.text = text;
         this.value = value;
     }
@@ -20,5 +23,6 @@ public enum MetaEnum {
     public String getValue() {
         return value;
     }
+
 
 }
