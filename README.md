@@ -2065,7 +2065,13 @@ List<TemplateMakerFileConfig.FileInfoConfig> fileConfigInfoList =  templateMaker
 
 同时还为了支持文件分组在fileFilterConfig中添加了新的groupconfig
 
+1.将所有文件配置（fileInfo）分为有分组的和无分组的
 
+2.对于有分组的文件配置，如果有相同的分组，同分组内的文件进行合并（merge），不同分组可同时保留
+
+3.创建新的文件配置列表（结果列表），先将合并后的分组添加到结果列表
+
+4.再将无分组的文件配置列表添加到结果列表
 
 
 

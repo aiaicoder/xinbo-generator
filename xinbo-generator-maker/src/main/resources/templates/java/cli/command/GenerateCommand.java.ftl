@@ -10,13 +10,13 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import java.util.concurrent.Callable;
 <#macro generateOption indent modelInfo>
-${indent}@Option(names = {<#if modelInfo.abbr??>"-${modelInfo.abbr}"</#if>,<#if modelInfo.fieldName??>"--${modelInfo.fieldName}"</#if>},arity = "0..1",<#if modelInfo.description??>description = "${modelInfo.description}", </#if>interactive = true,echo = true)
+${indent}@Option(names = {<#if modelInfo.abbr??>"-${modelInfo.abbr}",</#if><#if modelInfo.fieldName??>"--${modelInfo.fieldName}"</#if>},arity = "0..1",<#if modelInfo.description??>description = "${modelInfo.description}", </#if>interactive = true,echo = true)
 ${indent}private ${modelInfo.type} ${modelInfo.fieldName} <#if modelInfo.defaultValue??> = ${modelInfo.defaultValue?c}</#if>;
 </#macro>
 <#macro generateCommand indent modelInfo>
 ${indent}System.out.println("输入${modelInfo.groupName}配置：");
-${indent}CommandLine commandLine = new CommandLine(${modelInfo.type}Command.class);
-${indent}commandLine.execute(${modelInfo.allArgsStr});
+${indent}CommandLine ${modelInfo.groupKey}commandLine = new CommandLine(${modelInfo.type}Command.class);
+${indent}${modelInfo.groupKey}commandLine.execute(${modelInfo.allArgsStr});
 </#macro>
 /**
 * @author ${author}
@@ -55,10 +55,10 @@ public class GenerateCommand implements Callable<Integer> {
     <#if modelInfo.groupKey??>
     <#if modelInfo.condition??>
     if(${modelInfo.condition}){
-        <@generateCommand indent="    " modelInfo=modelInfo/>
+        <@generateCommand indent="       " modelInfo=modelInfo/>
     }
     <#else>
-        <@generateCommand indent="    " modelInfo=modelInfo/>
+        <@generateCommand indent="        " modelInfo=modelInfo/>
     </#if>
     </#if>
     </#list>

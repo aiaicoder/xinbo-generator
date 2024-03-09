@@ -66,7 +66,7 @@ public class MetaValidator {
         }
         // inputRootPath：.source + sourceRootPath 的最后一个层级路径
         String inputRootPath = fileConfig.getInputRootPath();
-        String defaultInputRootPath = ".source" + File.separator +
+        String defaultInputRootPath = ".source/"  +
                 FileUtil.getLastPathEle(Paths.get(sourceRootPath)).getFileName().toString();
         //判断inputRootPath是否为空，如果为空就设置默认值
         defaultInputRootPath = StrUtil.blankToDefault(inputRootPath, defaultInputRootPath);
@@ -83,9 +83,10 @@ public class MetaValidator {
 
         List<Meta.FileConfig.FileInfo> files = fileConfig.getFiles();
         for (Meta.FileConfig.FileInfo fileInfo : files) {
-            String groupKey = fileInfo.getType();
+            System.out.println(fileInfo);
+            String groupType= fileInfo.getType();
             //如果是在组里就无需校验
-            if (MetaEnum.GROUP.getValue().equals(groupKey)){
+            if (MetaEnum.GROUP.getValue().equals(groupType)){
                 fileInfo.getFiles().forEach(MetaValidator::checkedAndFillFileInfo);
                 continue;
             }

@@ -2,6 +2,7 @@ package com.xin.model;
 
 import com.xin.maker.meta.Meta;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
 
@@ -10,14 +11,15 @@ import java.util.List;
  */
 @Data
 public class TemplateMakerFileConfig {
-    private List<FileInfoConfig> fileInfoConfig;
+    private List<FileInfoConfig> files;
 
     private FileGroupConfig fileGroupConfig;
-
+    @NoArgsConstructor
     @Data
     public static class FileInfoConfig {
         private String path;
         private List<FileFilterConfig> filterConfigList;
+        private String condition;
     }
 
 
